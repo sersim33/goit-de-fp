@@ -5,5 +5,6 @@ sql_config = {
     "password": 'Proyahaxuqithab9oplp',
     "driver": "com.mysql.cj.jdbc.Driver",
     "table_results": 'athlete_event_results',
+    # "table_results": "aggregated_athlete_results",
     "table_bio": 'athlete_bio',
 }

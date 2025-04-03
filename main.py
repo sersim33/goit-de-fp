@@ -33,7 +33,7 @@ schema = StructType(
         StructField("sport", StringType(), True),
         StructField("medal", StringType(), True),
         StructField("timestamp", StringType(), True),
-        StructField("sex", StringType(), True),  # Додано поле 'sex'
+        StructField("sex", StringType(), True),  
     ]
 )
 
@@ -86,7 +86,7 @@ kafka_streaming_df = (
     .withColumn("value", regexp_replace(col("value"), '^"|"$', ""))
     .selectExpr("CAST(value AS STRING)")
     .select(from_json(col("value"), schema).alias("data"))
-    .select("data.athlete_id", "data.sport", "data.medal")
+    .select("data.athlete_id", "data.sport", "data.medal", "data.sex")
 )
 
 
@@ -99,6 +99,7 @@ athlete_bio_df = spark.read.format("jdbc").options(
     user=sql_config["user"],
     password=sql_config["password"]
 ).load()
+
 
 # Cast 'height' and 'weight' to double for numerical operations
 athlete_bio_df = athlete_bio_df.withColumn(
@@ -126,11 +127,12 @@ aggregated_df = joined_df.groupBy("sport", "medal", "sex", "country_noc").agg(
 )
 
 
+target_database = my_name 
+target_table = athlete_event_results_topic  
+
 def foreach_batch_function(df, epoch_id):
-    # Print the schema for debugging
     df.printSchema()
 
-    # Attempt to write to Kafka first
     try:
         df.selectExpr(
             "CAST(NULL AS STRING) AS key", "to_json(struct(*)) AS value"
@@ -148,20 +150,72 @@ def foreach_batch_function(df, epoch_id):
     except Exception as e:
         print(f"Error saving to Kafka: {e}")
 
-    # to write to MySQL
     try:
-        df.write.format("jdbc").options(
-            url=sql_config["url"],
+        # Записуємо тільки потрібні колонки до нової таблиці
+        df_to_write = df.select("sport", "medal", "sex", "country_noc", "avg_height", "avg_weight", "timestamp")
+
+        df_to_write.write.format("jdbc").options(
+            # url=f"{sql_config['url']}/{target_database}",
+            url="jdbc:mysql://217.61.57.46:3306/Sergii_Simak",
             driver=sql_config["driver"],
-            dbtable=sql_config["table_results"],
+            dbtable="Sergii_Simak_athlete_event_result",
             user=sql_config["user"],
             password=sql_config["password"],
         ).mode("append").save()
     except Exception as e:
         print(f"Error saving to MySQL: {e}")
 
+# def foreach_batch_function(df, epoch_id):
+#     # Print the schema for debugging
+#     df.printSchema()
 
-# Streaming processing
-aggregated_df.writeStream.outputMode("complete").foreachBatch(
+#     # Attempt to write to Kafka first
+#     try:
+#         df.selectExpr(
+#             "CAST(NULL AS STRING) AS key", "to_json(struct(*)) AS value"
+#         ).write.format("kafka").option(
+#             "kafka.bootstrap.servers", kafka_config["bootstrap_servers"]
+#         ).option(
+#             "kafka.security.protocol", kafka_config["security_protocol"]
+#         ).option(
+#             "kafka.sasl.mechanism", kafka_config["sasl_mechanism"]
+#         ).option(
+#             "kafka.sasl.jaas.config", kafka_config["sasl_jaas_config"]
+#         ).option(
+#             "topic", athlete_summary_topic
+#         ).save()
+#     except Exception as e:
+#         print(f"Error saving to Kafka: {e}")
+
+#     # to write to MySQL
+#     try:
+#         df.write.format("jdbc").options(
+#             url=sql_config["url"],
+#             driver=sql_config["driver"],
+#             dbtable=sql_config["table_results"],
+#             user=sql_config["user"],
+#             password=sql_config["password"],
+#         ).mode("append").save()
+#     except Exception as e:
+#         print(f"Error saving to MySQL: {e}")
+
+# Вивід результату на екран
+console_query = aggregated_df.writeStream.outputMode("complete").format("console").option("truncate", False).start()
+
+# Запис у Kafka/MySQL
+processing_query = aggregated_df.writeStream.outputMode("complete").foreachBatch(
     foreach_batch_function
-).option("checkpointLocation", "./checkpoint_dir").start().awaitTermination()
+).option("checkpointLocation", "./checkpoint_dir").start()
+
+# Очікуємо завершення обох потоків
+console_query.awaitTermination()
+processing_query.awaitTermination()
+
+
+
+
+
+ 
+
+
+ 
