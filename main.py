@@ -86,7 +86,7 @@ kafka_streaming_df = (
     .withColumn("value", regexp_replace(col("value"), '^"|"$', ""))
     .selectExpr("CAST(value AS STRING)")
     .select(from_json(col("value"), schema).alias("data"))
-    .select("data.athlete_id", "data.sport", "data.medal", "data.sex")
+    .select("data.athlete_id", "data.sport", "data.medal")
 )
 
 
@@ -165,39 +165,6 @@ def foreach_batch_function(df, epoch_id):
     except Exception as e:
         print(f"Error saving to MySQL: {e}")
 
-# def foreach_batch_function(df, epoch_id):
-#     # Print the schema for debugging
-#     df.printSchema()
-
-#     # Attempt to write to Kafka first
-#     try:
-#         df.selectExpr(
-#             "CAST(NULL AS STRING) AS key", "to_json(struct(*)) AS value"
-#         ).write.format("kafka").option(
-#             "kafka.bootstrap.servers", kafka_config["bootstrap_servers"]
-#         ).option(
-#             "kafka.security.protocol", kafka_config["security_protocol"]
-#         ).option(
-#             "kafka.sasl.mechanism", kafka_config["sasl_mechanism"]
-#         ).option(
-#             "kafka.sasl.jaas.config", kafka_config["sasl_jaas_config"]
-#         ).option(
-#             "topic", athlete_summary_topic
-#         ).save()
-#     except Exception as e:
-#         print(f"Error saving to Kafka: {e}")
-
-#     # to write to MySQL
-#     try:
-#         df.write.format("jdbc").options(
-#             url=sql_config["url"],
-#             driver=sql_config["driver"],
-#             dbtable=sql_config["table_results"],
-#             user=sql_config["user"],
-#             password=sql_config["password"],
-#         ).mode("append").save()
-#     except Exception as e:
-#         print(f"Error saving to MySQL: {e}")
 
 # Вивід результату на екран
 console_query = aggregated_df.writeStream.outputMode("complete").format("console").option("truncate", False).start()
