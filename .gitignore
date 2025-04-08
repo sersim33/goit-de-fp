@@ -1,0 +1,16 @@
+# Ignore Python bytecode files
+*.pyc
+__pycache__/
+
+# Ignore virtual environments
+myenv/
+
+# Ignore any checkpoint or temporary directories/files
+checkpoint/
+checkpoint_dir/
+
+# Ignore system-specific files (macOS)
+.DS_Store
+
+# Ignore logs or other unnecessary files
+*.log
